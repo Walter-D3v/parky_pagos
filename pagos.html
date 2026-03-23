@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>PARKY — Pagos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=DM+Mono:wght@400;500&display=swap');
+
+:root {
+  --bg:        #080810;
+  --surface:   #0f0f1a;
+  --surface2:  #16162a;
+  --border:    rgba(255,255,255,0.07);
+  --border2:   rgba(255,255,255,0.12);
+  --accent:    #b8f542;
+  --accent-dim:rgba(184,245,66,0.12);
+  --accent-glow:rgba(184,245,66,0.25);
+  --text:      #f0f0f8;
+  --muted:     #606080;
+  --danger:    #ff5555;
+  --warn:      #ffb347;
+  --r:         14px;
+  --r-lg:      20px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% -10%, rgba(184,245,66,0.06) 0%, transparent 70%),
+    linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+  background-size: auto, 48px 48px, 48px 48px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 0 16px 32px;
+}
+
+/* ─── HEADER ─────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 20px;
+  gap: 12px;
+}
+
+.logo-wrap { display: flex; align-items: center; gap: 10px; }
+
+.logo-badge {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  color: #080810;
+  flex-shrink: 0;
+}
+
+.logo-text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  letter-spacing: 3px;
+  color: var(--text);
+  line-height: 1;
+}
+
+.logo-sub {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.header-right { text-align: right; flex-shrink: 0; }
+
+#hora {
+  font-family: 'DM Mono', monospace;
+  font-size: clamp(18px, 5vw, 26px);
+  color: var(--accent);
+  line-height: 1;
+  letter-spacing: 1px;
+}
+
+#fecha {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-top: 3px;
+}
+
+/* ─── TICKER ─────────────────────────────────────────── */
+.ticker-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  overflow: hidden;
+  position: relative;
+  height: 36px;
+}
+
+.ticker-track {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  animation: ticker 28s linear infinite;
+  display: flex;
+  align-items: center;
+  gap: 48px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.ticker-track span {
+  display: flex; align-items: center; gap: 8px;
+}
+
+.ticker-dot {
+  width: 5px; height: 5px;
+  background: var(--accent);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: blink 2s infinite;
+}
+
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+@keyframes ticker { 0%{left:100%} 100%{left:-200%} }
+
+/* ─── PANTALLAS ──────────────────────────────────────── */
+.screen { display: none; flex-direction: column; flex: 1; }
+.screen.active { display: flex; }
+
+/* ─── IDLE ───────────────────────────────────────────── */
+#s-idle {
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.idle-orb {
+  width: clamp(100px,30vw,140px);
+  height: clamp(100px,30vw,140px);
+  border-radius: 50%;
+  border: 1px solid var(--border2);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+}
+
+.idle-orb::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  border: 1px solid rgba(184,245,66,0.1);
+  animation: rot 10s linear infinite;
+}
+
+.idle-orb::after {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  border-radius: 50%;
+  border: 1px dashed rgba(184,245,66,0.05);
+  animation: rot 18s linear infinite reverse;
+}
+
+@keyframes rot { to { transform: rotate(360deg); } }
+
+.idle-letter {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(52px,15vw,72px);
+  color: var(--accent);
+  line-height: 1;
+  filter: drop-shadow(0 0 20px rgba(184,245,66,0.3));
+}
+
+.idle-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(24px,7vw,34px);
+  letter-spacing: 2px;
+  color: var(--text);
+}
+
+.idle-desc {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 280px;
+}
+
+/* ─── BOTONES ────────────────────────────────────────── */
+.btn {
+  border: none;
+  border-radius: var(--r);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 15px 24px;
+  transition: transform .15s, box-shadow .15s, opacity .15s;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none !important; }
+
+.btn-primary {
+  background: var(--accent);
+  color: #080810;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 3px;
+  padding: 18px 24px;
+  box-shadow: 0 0 40px var(--accent-glow);
+  max-width: 340px;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 60px var(--accent-glow);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+
+.btn-ghost:hover { border-color: var(--border2); color: var(--text); }
+
+.btn-pay {
+  background: var(--accent);
+  color: #080810;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 20px;
+  letter-spacing: 3px;
+  padding: 18px 24px;
+  box-shadow: 0 0 40px var(--accent-glow);
+}
+
+.btn-pay:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 0 60px var(--accent-glow);
+}
+
+/* ─── SCANNER ────────────────────────────────────────── */
+#s-scan { gap: 16px; }
+
+.scan-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px;
+  letter-spacing: 2px;
+  text-align: center;
+}
+
+.scan-hint {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.video-wrap {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: #000;
+  aspect-ratio: 1/1;
+  max-height: 55vw;
+  max-height: min(420px, 55vw);
+  align-self: center;
+  width: 100%;
+}
+
+#video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.scan-ui {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.scan-box {
+  width: clamp(140px,45%,200px);
+  height: clamp(140px,45%,200px);
+  position: relative;
+}
+
+.scan-box::before,.scan-box::after,
+.c-br,.c-bl {
+  content:'';
+  position: absolute;
+  width: 24px; height: 24px;
+  border-color: var(--accent);
+  border-style: solid;
+}
+.scan-box::before { top:0; left:0;  border-width: 3px 0 0 3px; border-radius: 4px 0 0 0; }
+.scan-box::after  { top:0; right:0; border-width: 3px 3px 0 0; border-radius: 0 4px 0 0; }
+.c-br { bottom:0; right:0; border-width: 0 3px 3px 0; border-radius: 0 0 4px 0; }
+.c-bl { bottom:0; left:0;  border-width: 0 0 3px 3px; border-radius: 0 0 0 4px; }
+
+.scan-line {
+  position: absolute;
+  inset: 0 4px;
+  height: 2px;
+  top: 4px;
+  background: linear-gradient(90deg,transparent,var(--accent),transparent);
+  animation: scanline 2.2s ease-in-out infinite;
+}
+
+@keyframes scanline {
+  0%   { top: 8%; opacity:.8; }
+  90%  { top: 88%; opacity:.8; }
+  100% { top: 88%; opacity: 0; }
+}
+
+/* ─── TICKET ─────────────────────────────────────────── */
+#s-ticket { gap: 14px; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.card-top {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.card-ref {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.card-ref strong {
+  display: block;
+  font-size: 16px;
+  color: var(--text);
+  margin-top: 2px;
+  letter-spacing: 1px;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+.badge-activo  { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(184,245,66,.25); }
+.badge-pagado  { background: rgba(100,220,100,.1); color: #70d470; border: 1px solid rgba(100,220,100,.25); }
+.badge-anulado { background: rgba(255,85,85,.1); color: var(--danger); border: 1px solid rgba(255,85,85,.25); }
+
+.card-rows { padding: 4px 0; }
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 11px 20px;
+  border-bottom: 1px solid var(--border);
+  gap: 16px;
+}
+
+.row:last-child { border-bottom: none; }
+
+.row-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  flex-shrink: 0;
+}
+
+.row-val {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+}
+
+/* Monto destacado */
+.monto-block {
+  background: var(--surface2);
+  border: 1px solid rgba(184,245,66,0.15);
+  border-radius: var(--r);
+  padding: 16px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.monto-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.monto-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(32px,10vw,48px);
+  color: var(--accent);
+  line-height: 1;
+  filter: drop-shadow(0 0 12px rgba(184,245,66,.25));
+}
+
+.monto-cur {
+  font-size: 18px;
+  vertical-align: super;
+  font-size: 60%;
+  margin-right: 2px;
+}
+
+/* Banner ya pagado */
+.banner-warn {
+  background: rgba(255,85,85,.08);
+  border: 1px solid rgba(255,85,85,.2);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #ff8888;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* ─── MODAL ──────────────────────────────────────────── */
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.88);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(12px);
+}
+
+.overlay.show { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border-radius: 24px;
+  padding: 40px 32px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+  animation: pop .4s cubic-bezier(.175,.885,.32,1.275);
+  position: relative;
+}
+
+.modal-ok  { border: 1px solid rgba(184,245,66,.25); }
+.modal-err { border: 1px solid rgba(255,85,85,.25); }
+
+@keyframes pop {
+  from { transform: scale(.75); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.modal-icon {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 32px;
+}
+
+.modal-ok  .modal-icon { background: var(--accent-dim); border: 2px solid var(--accent); animation: glow 2s infinite; }
+.modal-err .modal-icon { background: rgba(255,85,85,.1); border: 2px solid var(--danger); }
+
+@keyframes glow {
+  0%,100% { box-shadow: 0 0 0 0 transparent; }
+  50%      { box-shadow: 0 0 0 12px rgba(184,245,66,.1); }
+}
+
+.modal-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 28px;
+  letter-spacing: 2px;
+  margin-bottom: 8px;
+}
+
+.modal-ok .modal-title  { color: var(--accent); }
+.modal-err .modal-title { color: var(--danger); }
+
+.modal-body {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 20px;
+}
+
+.modal-amount {
+  font-family: 'DM Mono', monospace;
+  font-size: 20px;
+  color: var(--text);
+  background: var(--accent-dim);
+  border-radius: 10px;
+  padding: 10px 20px;
+  margin-bottom: 24px;
+  display: inline-block;
+  width: 100%;
+}
+
+/* ─── SPINNER ────────────────────────────────────────── */
+.spinner {
+  width: 18px; height: 18px;
+  border: 2px solid rgba(8,8,16,.3);
+  border-top-color: #080810;
+  border-radius: 50%;
+  animation: rot .7s linear infinite;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* ─── TOAST ──────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(60px);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 13px;
+  color: var(--text);
+  z-index: 200;
+  transition: transform .3s;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.toast.show { transform: translateX(-50%) translateY(0); }
+
+/* ─── RESPONSIVE ─────────────────────────────────────── */
+@media (min-width: 480px) {
+  .app { padding: 0 24px 40px; }
+  .header { padding: 24px 0 20px; }
+}
+
+@media (min-width: 600px) {
+  .video-wrap { max-height: 360px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo-wrap">
+      <div class="logo-badge">P</div>
+      <div>
+        <div class="logo-text">PARKY</div>
+        <div class="logo-sub">Módulo de pagos</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div id="hora">00:00:00</div>
+      <div id="fecha">—</div>
+    </div>
+  </header>
+
+  <!-- Ticker de anuncios -->
+  <div class="ticker-wrap">
+    <div class="ticker-track">
+      <span><span class="ticker-dot"></span>Conserve su ticket QR — lo necesita para validar su salida</span>
+      <span><span class="ticker-dot"></span>Pague antes de dirigirse a la salida vehicular</span>
+      <span><span class="ticker-dot"></span>Tarifas disponibles para estudiantes, empleados y visitantes</span>
+      <span><span class="ticker-dot"></span>Para soporte contacte a la administración del parqueo</span>
+      <span><span class="ticker-dot"></span>Conserve su ticket QR — lo necesita para validar su salida</span>
+    </div>
+  </div>
+
+  <!-- PANTALLA IDLE -->
+  <div id="s-idle" class="screen active">
+    <div class="idle-orb">
+      <div class="idle-letter">P</div>
+    </div>
+    <div>
+      <div class="idle-title">PAGUE SU TICKET</div>
+      <p class="idle-desc" style="margin-top:10px">
+        Tenga listo el código QR de su ticket de entrada y presione el botón para comenzar
+      </p>
+    </div>
+    <button class="btn btn-primary" onclick="irScanner()">
+      PRESIONE PARA PAGAR
+    </button>
+  </div>
+
+  <!-- PANTALLA SCANNER -->
+  <div id="s-scan" class="screen">
+    <div class="scan-title">ESCANEE SU QR</div>
+    <p class="scan-hint">Apunte la cámara al código QR de su ticket de entrada</p>
+    <div class="video-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div class="scan-ui">
+        <div class="scan-box">
+          <div class="c-br"></div>
+          <div class="c-bl"></div>
+          <div class="scan-line"></div>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-ghost" onclick="cancelarScanner()">Cancelar</button>
+  </div>
+
+  <!-- PANTALLA TICKET -->
+  <div id="s-ticket" class="screen">
+
+    <div class="card">
+      <div class="card-top">
+        <div class="card-ref">
+          N° de ticket
+          <strong id="tk-ref">—</strong>
+        </div>
+        <div class="badge badge-activo" id="tk-badge">activo</div>
+      </div>
+      <div class="card-rows">
+        <div class="row">
+          <span class="row-label">Vehículo</span>
+          <span class="row-val" id="tk-vehiculo">—</span>
+        </div>
+        <div class="row">
+          <span class="row-label">Entrada</span>
+          <span class="row-val" id="tk-entrada">—</span>
+        </div>
+        <div class="row">
+          <span class="row-label">Tiempo</span>
+          <span class="row-val" id="tk-tiempo">—</span>
+        </div>
+        <div class="row">
+          <span class="row-label">Tarifa</span>
+          <span class="row-val" id="tk-tarifa">—</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="monto-block">
+      <div>
+        <div class="monto-label">Total a pagar</div>
+      </div>
+      <div class="monto-num">
+        <span class="monto-cur">$</span><span id="tk-monto">0.00</span>
+      </div>
+    </div>
+
+    <div class="banner-warn" id="banner-warn" style="display:none">
+      Este ticket ya fue pagado o cancelado y no puede procesarse de nuevo.
+    </div>
+
+    <button class="btn btn-pay" id="btn-pay" onclick="confirmarPago()">
+      PAGAR AHORA
+    </button>
+
+    <button class="btn btn-ghost" onclick="irInicio()">Cancelar</button>
+  </div>
+
+</div><!-- .app -->
+
+<!-- Modal éxito -->
+<div class="overlay" id="m-ok">
+  <div class="modal modal-ok">
+    <div class="modal-icon">✓</div>
+    <div class="modal-title">TICKET PAGADO</div>
+    <p class="modal-body">
+      Pago procesado correctamente.<br>
+      Diríjase a la salida y escanee su QR para abrir la pluma.
+    </p>
+    <div class="modal-amount" id="m-ok-monto">$0.00 pagados</div>
+    <button class="btn btn-ghost" onclick="cerrarOk()">NUEVA OPERACIÓN</button>
+  </div>
+</div>
+
+<!-- Modal error -->
+<div class="overlay" id="m-err">
+  <div class="modal modal-err">
+    <div class="modal-icon">✕</div>
+    <div class="modal-title">ERROR</div>
+    <p class="modal-body" id="m-err-txt">Error inesperado.</p>
+    <button class="btn btn-ghost" onclick="cerrarErr()">CERRAR</button>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Config ─────────────────────────────────────────────────────────────────
+const API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000'
+  : `http://${location.hostname}:5000`;
+
+// ── Reloj ──────────────────────────────────────────────────────────────────
+function tick() {
+  const n = new Date();
+  document.getElementById('hora').textContent =
+    n.toLocaleTimeString('es-SV', { hour12: false });
+  document.getElementById('fecha').textContent =
+    n.toLocaleDateString('es-SV', { weekday:'short', day:'2-digit', month:'short', year:'numeric' })
+     .replace(/\./g,'').toUpperCase();
+}
+tick(); setInterval(tick, 1000);
+
+// ── Navegación ─────────────────────────────────────────────────────────────
+function mostrar(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function irInicio() { detenerCam(); mostrar('s-idle'); }
+
+// ── Scanner ────────────────────────────────────────────────────────────────
+let stream = null, raf = null, scanning = false, tkActual = null;
+
+async function irScanner() {
+  mostrar('s-scan');
+  scanning = true;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 } }
+    });
+    const v = document.getElementById('video');
+    v.srcObject = stream;
+    await v.play();
+    v.addEventListener('loadeddata', leerFrame, { once: true });
+    raf = requestAnimationFrame(leerFrame);
+  } catch(e) {
+    mostrarErr('No se pudo acceder a la cámara:\n' + e.message);
+    mostrar('s-idle');
+  }
+}
+
+function leerFrame() {
+  if (!scanning) return;
+  const v = document.getElementById('video');
+  if (v.readyState < 2) { raf = requestAnimationFrame(leerFrame); return; }
+  const c = document.createElement('canvas');
+  c.width = v.videoWidth; c.height = v.videoHeight;
+  c.getContext('2d').drawImage(v, 0, 0);
+  const img = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+  const qr  = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+  if (qr?.data) {
+    scanning = false;
+    detenerCam();
+    buscarTicket(qr.data.trim());
+  } else {
+    raf = requestAnimationFrame(leerFrame);
+  }
+}
+
+function detenerCam() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (raf)    { cancelAnimationFrame(raf); raf = null; }
+}
+
+function cancelarScanner() { scanning = false; detenerCam(); mostrar('s-idle'); }
+
+// ── Buscar ticket ──────────────────────────────────────────────────────────
+async function buscarTicket(id) {
+  toast('Buscando ticket...');
+  try {
+    const r = await fetch(`${API}/api/ticket/${encodeURIComponent(id)}`);
+    const d = await r.json();
+    if (!r.ok) { mostrarErr(d.detail || 'Ticket no encontrado'); mostrar('s-idle'); return; }
+    tkActual = d;
+    llenarTicket(d);
+    mostrar('s-ticket');
+  } catch(e) {
+    mostrarErr('No se pudo conectar al servidor.\nVerifique la conexión e intente de nuevo.');
+    mostrar('s-idle');
+  }
+}
+
+function llenarTicket(d) {
+  document.getElementById('tk-ref').textContent     = d.id_ticket.slice(0,8).toUpperCase();
+  document.getElementById('tk-vehiculo').textContent = d.tipo_vehiculo.toUpperCase();
+  document.getElementById('tk-entrada').textContent  = d.tiempo_entrada;
+  document.getElementById('tk-tiempo').textContent   = `${d.horas_transcurridas.toFixed(1)} hrs`;
+  document.getElementById('tk-tarifa').textContent   =
+    `${d.tarifa_nombre}  $${d.tarifa_por_hora.toFixed(2)}/hr`;
+  document.getElementById('tk-monto').textContent    = d.monto_a_pagar.toFixed(2);
+
+  const badge = document.getElementById('tk-badge');
+  badge.textContent = d.estado;
+  badge.className   = `badge badge-${d.estado}`;
+
+  const yaPagado = d.ya_pagado;
+  document.getElementById('btn-pay').disabled              = yaPagado;
+  document.getElementById('banner-warn').style.display     = yaPagado ? 'block' : 'none';
+}
+
+// ── Pagar ──────────────────────────────────────────────────────────────────
+async function confirmarPago() {
+  if (!tkActual) return;
+  const btn = document.getElementById('btn-pay');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>&nbsp;PROCESANDO...';
+
+  try {
+    const r = await fetch(`${API}/api/ticket/${encodeURIComponent(tkActual.id_ticket)}/pagar`, {
+      method: 'POST'
+    });
+    const d = await r.json();
+
+    if (!r.ok) {
+      mostrarErr(d.detail || 'Error al procesar el pago');
+      btn.disabled = false;
+      btn.innerHTML = 'PAGAR AHORA';
+      return;
+    }
+
+    document.getElementById('m-ok-monto').textContent =
+      `$${d.monto_pagado.toFixed(2)} pagados`;
+    document.getElementById('m-ok').classList.add('show');
+
+  } catch(e) {
+    mostrarErr('Error de conexión al procesar el pago.');
+    btn.disabled = false;
+    btn.innerHTML = 'PAGAR AHORA';
+  }
+}
+
+// ── Modales ────────────────────────────────────────────────────────────────
+function mostrarErr(msg) {
+  document.getElementById('m-err-txt').textContent = msg;
+  document.getElementById('m-err').classList.add('show');
+}
+
+function cerrarOk()  { document.getElementById('m-ok').classList.remove('show'); irInicio(); }
+function cerrarErr() { document.getElementById('m-err').classList.remove('show'); }
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let tTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  if (tTimer) clearTimeout(tTimer);
+  tTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
